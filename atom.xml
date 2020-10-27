@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2020-07-18T07:12:19.734Z</updated>
+  <updated>2020-10-27T11:59:03.513Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -15,6 +15,35 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>浏览器模型基础</title>
+    <link href="http://yoursite.com/2020/10/27/%E6%B5%8F%E8%A7%88%E5%99%A8%E6%A8%A1%E5%9E%8B%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86/"/>
+    <id>http://yoursite.com/2020/10/27/%E6%B5%8F%E8%A7%88%E5%99%A8%E6%A8%A1%E5%9E%8B%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86/</id>
+    <published>2020-10-27T11:55:51.841Z</published>
+    <updated>2020-10-27T11:59:03.513Z</updated>
+    
+    <content type="html"><![CDATA[<h1 id="浏览器模型问题"><a href="#浏览器模型问题" class="headerlink" title="浏览器模型问题"></a>浏览器模型问题</h1><p>多进程与多线程</p><h3 id="浏览器的多进程"><a href="#浏览器的多进程" class="headerlink" title="浏览器的多进程"></a>浏览器的多进程</h3><p>以chrome为代表的主流浏览器都是使用多进程的模型，主要有五种进程</p><p><img src="https://my-blog-rookie.oss-cn-beijing.aliyuncs.com/img/image-20201021174728754.png" alt="image-20201021174728754"></p><ul><li>Browser Process: 浏览器主进程，负责主控和调用，创建和销毁其他进程。</li><li>GPU Process: 主要负责GPU相关操作。</li><li>Renderer Process: 每创建一个tab页就会开启一个Renderer Process 负责对应的tab页的内部网页呈现的所有，比如说页面渲染，事件执行，脚本执行。这个进程是多线程的。它就是常说的浏览器内核</li><li>Plugin Process: 启用一个插件就会创建一个对应的进程。</li></ul><p><img src="https://my-blog-rookie.oss-cn-beijing.aliyuncs.com/img/image-20201021175217987.png" alt="image-20201021175217987"></p><h3 id="浏览器的多线程"><a href="#浏览器的多线程" class="headerlink" title="浏览器的多线程"></a>浏览器的多线程</h3><p>Renderer Process是浏览器为每一个tab页单独启用的进程，所以每一个Renderer Process 都会有独立的渲染引擎实例。一般来说一个tab下会有如下五个线程</p><p><img src="https://my-blog-rookie.oss-cn-beijing.aliyuncs.com/img/image-20201021180735426.png" alt="image-20201021180735426"></p><ul><li>CUI线程: 这个线程负责渲染页面的html元素，它再重绘和重排的时候会执行。这个线程和 JS引擎线程互斥。</li></ul><blockquote><p>HTML渲染大致分为如下几步：</p><ol><li>HTML被HTML解析器解析成DOM Tree, css则被css解析器解析成CSSOM Tree。</li><li>DOM Tree和CSSOM Tree解析完成后，被附加到一起，形成渲染树（Render Tree）。</li><li>节点信息计算(重排)，这个过程被叫做Layout(Webkit)或者Reflow(Mozilla)。即根据渲染树计算每个节点的几何信息。</li><li>渲染绘制(重绘)，这个过程被叫做(Painting 或者 Repaint)。即根据计算好的信息绘制整个页面。</li></ol><p>以上4步简述浏览器的一次渲染过程，理论上，每一次的dom更改或者css几何属性更改，都会引起一次浏览器的重排/重绘过程，而如果是css的非几何属性更改，则只会引起重绘过程。所以说重排一定会引起重绘，而重绘不一定会引起重排。</p></blockquote><ul><li>JS引擎线程(chrome的V8)：JS内核，在后台等待任务，负责解析运行 JS 代码，在一个 Renderer 进程之中同时只能有一个 JS 线程。（JS的单线程性）</li><li>定时触发线程：setTimeout和setInterval的计时器线程，由于 JS 的单线程性，所以设计成又单独的线程计时。</li><li>事件触发线程：负责将浏览器和其他线程触发的符合要求的事件添加到 JS 引擎队列的末尾，等待 JS 引擎执行。</li><li>异步请求线程：在XMLHttpRequest在连接后是通过浏览器新开一个线程请求， 将检测到状态变更时，如果设置有回调函数，异步线程就产生状态变更事件放到 JavaScript引擎的处理队列中等待处理。</li></ul><p>关于JS单线程的解决</p><blockquote><p>为了多核CPU的计算能力，HTML5提出Web Worker标准，允许JavaScript脚本创建多个线程，但是子线程完全受主线程控制，且不得操作DOM。所以，这个新标准并没有改变JavaScript单线程的本质。</p></blockquote><h2 id="web-workers"><a href="#web-workers" class="headerlink" title="web workers"></a>web workers</h2><h3 id="web-workers的概念"><a href="#web-workers的概念" class="headerlink" title="web workers的概念"></a>web workers的概念</h3><blockquote><p>Web Worker为Web内容在后台线程中运行脚本提供了一种简单的方法。线程可以执行任务而不干扰用户界面。一旦创建， 一个worker 可以将消息发送到创建它的JavaScript代码, 通过将消息发布到该代码指定的事件处理程序（反之亦然）。</p></blockquote><h3 id="web-workers的用法"><a href="#web-workers的用法" class="headerlink" title="web workers的用法"></a>web workers的用法</h3><p>使用构造函数可以创建一个worker对象，构造函数接受一个JavaScript文件的URL，这个文件就是将要在worker线程中运行的代码。值得注意的是worker将会运行在与页面window对象完全不同的全局上下文中。</p><p>在worker线程中你可以运行大部分代码，但是有一些例外：</p><ul><li>DOM对象</li><li>window对象的某些属性和方法</li><li>documen对象</li><li>parent对象</li></ul><p>详细的信息可以参考：<a href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Functions_and_classes_available_to_workers" target="_blank" rel="noopener">Functions and classes available to Web Workers</a></p><h3 id="特殊种类的web-workers"><a href="#特殊种类的web-workers" class="headerlink" title="特殊种类的web workers"></a>特殊种类的web workers</h3><ul><li><p>shared workers：可以被不同窗口的对各脚本运行，只要这些workers处于同一个主域。详细的用法会在之后的博文介绍</p></li><li><p>service workers ：般作为web应用程序、浏览器和网络（如果可用）之间的代理服务。他们旨在（除开其他方面）创建有效的离线体验，拦截网络请求，以及根据网络是否可用采取合适的行动，更新驻留在服务器上的资源。他们还将允许访问推送通知和后台同步API。</p><blockquote><p>从网络安全的角度看，此woekers可以被利用成一个持久化XSS的工具。</p></blockquote></li></ul><p><a href="https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Workers_APIs" target="_blank" rel="noopener">官方文档</a></p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;h1 id=&quot;浏览器模型问题&quot;&gt;&lt;a href=&quot;#浏览器模型问题&quot; class=&quot;headerlink&quot; title=&quot;浏览器模型问题&quot;&gt;&lt;/a&gt;浏览器模型问题&lt;/h1&gt;&lt;p&gt;多进程与多线程&lt;/p&gt;
+&lt;h3 id=&quot;浏览器的多进程&quot;&gt;&lt;a href=&quot;#浏览器的多进程&quot; cl
+      
+    
+    </summary>
+    
+    
+      <category term="浏览器模型" scheme="http://yoursite.com/categories/%E6%B5%8F%E8%A7%88%E5%99%A8%E6%A8%A1%E5%9E%8B/"/>
+    
+    
+      <category term="web workers" scheme="http://yoursite.com/tags/web-workers/"/>
+    
+      <category term="JS相关" scheme="http://yoursite.com/tags/JS%E7%9B%B8%E5%85%B3/"/>
+    
+  </entry>
   
   <entry>
     <title>对文件上传的一些小理解</title>

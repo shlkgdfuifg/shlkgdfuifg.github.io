@@ -14,7 +14,7 @@
 
 
 
-<title>域渗透学习—NTML协议基础 | 青山</title>
+<title>内网渗透学习—LDAP协议 | 青山</title>
 
 
 
@@ -176,7 +176,7 @@
     
     <article class="post-wrap">
         <header class="post-header">
-            <h1 class="post-title">域渗透学习—NTML协议基础</h1>
+            <h1 class="post-title">内网渗透学习—LDAP协议</h1>
             
                 <div class="post-meta">
                     
@@ -185,7 +185,7 @@
 
                     
                         <span class="post-time">
-                        Date: <a href="#">November 12, 2020&nbsp;&nbsp;19:58:48</a>
+                        Date: <a href="#">November 17, 2020&nbsp;&nbsp;17:43:22</a>
                         </span>
                     
                     
@@ -194,67 +194,58 @@
         </header>
 
         <div class="post-content">
-            <h1 id="NTML协议"><a href="#NTML协议" class="headerlink" title="NTML协议"></a>NTML协议</h1><h2 id="LM-Hash-amp-NTML-Hash"><a href="#LM-Hash-amp-NTML-Hash" class="headerlink" title="LM Hash&amp;NTML Hash"></a>LM Hash&amp;NTML Hash</h2><p>windows内部是不保存明文密码的，只保存密码的hash值</p>
+            <h1 id="LDAP协议"><a href="#LDAP协议" class="headerlink" title="LDAP协议"></a>LDAP协议</h1><p><em>LDAP</em>(Lightweight Directory Access Protocol)，轻量级目录访问协议，LDAP是一个设计来访问<strong><em>目录*</em></strong>数据库* 的协议</p>
+<p>而一个<em>目录服务</em> 就是由一个<em>目录服务数据库</em> 加上一套访问协议组成的。对于域渗透来说，这一套组合就是<code>AD+LDAP</code></p>
 <blockquote>
-<p>本机的用户密码hash是放在本地的SAM文件里面，域内用户的密码hash存在域控的NTDS.DIT文件的。</p>
+<p>一些名词</p>
+<p>DC(domain component): 域名组件，表示从属于那个域</p>
+<p>CN(Common Name):通用名，可辨别名</p>
+<p>OU(Organizational Unit):组织单位，表示用户组</p>
 </blockquote>
-<p>windows密码hash保存模式，类似如下</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Administrator:500:AAD3B435B51404EEAAD3B435B51404EE:31D6CFE0D16AE931B73C59D7E0C089C0:::</span><br></pre></td></tr></table></figure>
-
-<p><code>AAD3B435B51404EEAAD3B435B51404EE</code>是<code>LM hash</code></p>
-<p><code>31D6CFE0D16AE931B73C59D7E0C089C0</code>是<code>NTML hash</code></p>
-<h3 id="LM-hash-LAN-Manager-Hash-老密码"><a href="#LM-hash-LAN-Manager-Hash-老密码" class="headerlink" title="LM hash (LAN Manager Hash) 老密码"></a>LM hash (LAN Manager Hash) 老密码</h3><p><em>LM Hash 的算法</em></p>
-<ol>
-<li>将用户密码转化为大写，再将转化后的密码转化成十六进制字符串，不足14字节将会使用0再末尾补全。</li>
-<li>上一步得到的十六进制字符串分成两个7byte的部分，每部分转化成byte流，长度为56bit，长度不足的使用0在左边补齐。</li>
-<li>再分为7bit一组，每组末尾加0，凑足8bit，重新组回两组。</li>
-<li>上步骤得到的二组，分别作为Key对<code>KGS!@#$%</code>进行DES加密。</li>
-<li>加密后的两组拼接到一起，得到最终的LM Hash</li>
-</ol>
-<p><em>LM Hash的一些弊端</em></p>
+<h2 id="Active-Directory-活动目录"><a href="#Active-Directory-活动目录" class="headerlink" title="Active Directory 活动目录"></a>Active Directory 活动目录</h2><h3 id="目录服务器"><a href="#目录服务器" class="headerlink" title="目录服务器"></a>目录服务器</h3><p>目录服务器的特点</p>
 <ul>
-<li>密码方面的限制<ul>
-<li>密码长度最大只能为14个字符</li>
-<li>密码不区分大小写</li>
+<li>树状结构组织数据，类似文件系统</li>
+<li>特化查询、浏览、搜索的数据库。读能力强，写能力弱</li>
+<li>必须要搭配 一个访问目录数据库的协议</li>
 </ul>
-</li>
-<li>加密过程中的一些漏洞<ul>
-<li>如果密文的后半部分是<code>aad3b435b51404ee</code>，那么就意味着，这个密码的长度是小于等于7位的，密码强度大大减少</li>
-<li>des密码强度并不高</li>
+<h3 id="Nameing-Context"><a href="#Nameing-Context" class="headerlink" title="Nameing Context"></a>Nameing Context</h3><p>  由于域林结构的复杂性，AD被设计得具有分布式特点。一个域林之中有多个域，一个域有多个域控，而每一台域控都有一个独立的AD，那么就有必要将数据隔离到多个分区中，如果不隔离的话，每个域控都要复制整个林环境的数据。分区之后域控就可以有选择的复制数据，而windows的就将AD划分成若干个分区，这些分区就是Nameing Context(命名上下文，简称NC)，每个NC都有自己的安全边界。</p>
+<p>AD预定义了三个Nameing Context</p>
+<ul>
+<li>Configuration NC(配置NC)</li>
+<li>Domian NC(域NC)</li>
+<li>Schema NC(模式NC)</li>
 </ul>
-</li>
-</ul>
-<h3 id="NTLM-hash"><a href="#NTLM-hash" class="headerlink" title="NTLM hash"></a>NTLM hash</h3><p><em>NTLM hash 的算法</em></p>
-<ol>
-<li>将用户的密码转化成16进制形式</li>
-<li>把转化成16进制的密码进行unicode编码</li>
-<li>使用MD4摘要算法对上一步得到的unicode编码进行hash计算</li>
-</ol>
-<p><em>NTLM hash本地的认证</em></p>
-<p>当用户注销、重启、锁屏之后，windows会让<strong><em>winlogon</em></strong>显示登陆界面，接收用户的输入之后，会将将密码交付给<strong><em>lsass</em></strong>进程，这个进程会将明文密码加密成NTLM hash，再与<strong><em>SAM数据库</em></strong>里对应的用户密码做对比。</p>
+<h4 id="Configuration-NC"><a href="#Configuration-NC" class="headerlink" title="Configuration NC"></a>Configuration NC</h4><p>配置NC，域林的配置信息的主要储存数据库，包含有关站点，服务，分区和Active DirectorySchema 的信息，这个NC会被复制到每个域控的AD里。如<code>rookie.com</code>域林的配置NC就是<code>CN=Configuration,DC=rookie,DC=com</code>。</p>
+<p><img src="https://my-blog-rookie.oss-cn-beijing.aliyuncs.com/img/image-20201117220602429.png" alt="image-20201117220602429"></p>
+<h4 id="Domian-NC"><a href="#Domian-NC" class="headerlink" title="Domian NC"></a>Domian NC</h4><p>每一个域都有一个域NC，不同的域有不同的域NC，用于存储一些特定的与域相关的数据，其中包括该域内的所有计算机，所有用户的具体信息。有如下条目</p>
+<p> <img src="https://my-blog-rookie.oss-cn-beijing.aliyuncs.com/img/image-20201117224643073.png" alt="image-20201117224643073"></p>
+<p><em>具体含义</em></p>
+<p><img src="https://my-blog-rookie.oss-cn-beijing.aliyuncs.com/img/image-20201117224737656.png" alt="image-20201117224737656"></p>
+<h4 id="Schema-NC"><a href="#Schema-NC" class="headerlink" title="Schema NC"></a>Schema NC</h4><p>包含Schema信息，这个信息定义了AD中使用的类，对象和属性。</p>
 <blockquote>
+<p>LDAP中的类</p>
+<p>域内所有条目都是一个类的实例。</p>
+<p><img src="https://my-blog-rookie.oss-cn-beijing.aliyuncs.com/img/image-20201118202310400.png" alt="image-20201118202310400"></p>
+<p>这就是AD之中的一个条目，这个条目是类Computer的实例，其中有什么属性就是有类Computer决定的。</p>
+<p>可以在ObjectClass属性查看实例所有的相关类，包括这个条目对应的类和它的父类。</p>
+<p><img src="https://my-blog-rookie.oss-cn-beijing.aliyuncs.com/img/image-20201118204140436.png" alt="image-20201118204140436"></p>
+<p><em>类的继承关系是从上至下的</em></p>
+<p>类有三种类型</p>
 <ul>
-<li><p>winlogon(Windows logon process)windows注册进程：是windows NT 用户的登陆程序，用于管理用户的登陆与退出</p>
+<li><p>结构类（Structural）</p>
+<p>结构类规定了对象实例的基本属性，每个条目属于且仅属于一个结构型对象类。前面说过域内每个条目都是类的实例，这个类必须是结构类。只有结构类才有实例。比如说前面说过的Computer类。</p>
 </li>
-<li><p>lsass( Local Security Authority Service): 用于本地安全与登陆策略</p>
+<li><p>抽象类(Abstract)</p>
+<p>抽象类型是结构类或其他抽象类的父类，它将对象属性中公共的部分组织在一起。跟面对对象里面的抽象方法一样，他没有实例，只能充当结构类或者抽象类的父类。比如说top 类。注意抽象类只能从另一个抽象类继承。</p>
 </li>
-<li><p>SAM(Security Account Manager 安全账户管理)：windows采用的账户管理策略，这个策略会将本地组的用户的账户和hash加密之后保存到SAM数据库中，SAM数据库文件路径是<code>%systemroot%\system32\config\SAM</code>文件</p>
+<li><p>辅助类(Auxiliary）</p>
+<p>辅助类型规定了对象实体的扩展属性。虽然每个条目只属于一个结构型对象类，但可以同时属于多个辅助型对象类。注意辅助类不能从结构类继承</p>
 </li>
 </ul>
 </blockquote>
-<h2 id="NTLM-身份验证机制"><a href="#NTLM-身份验证机制" class="headerlink" title="NTLM 身份验证机制"></a>NTLM 身份验证机制</h2><p>NTLM 身份验证采用的是 <code>Challenge(挑战)/Response(响应)</code>验证机制，有三步组成：协商，质询，身份验证</p>
-<p><strong><em>客户机与服务器的交互过程示意图(域控不参加的情况)</em></strong></p>
-<p><img src="https://my-blog-rookie.oss-cn-beijing.aliyuncs.com/img/image-20201111174315667.png" alt="image-20201111174315667"></p>
-<ul>
-<li>协商：Client会发送一个带有用户信息(用户名)和服务器请求的功能列表</li>
-<li>质询：Server对Client发出的<strong><em>协商</em></strong> 做出回应，返回的内容包含服务器同意并且支持的功能列表，更重要的是包含了服务器产生的<code>challenge</code></li>
-<li>身份验证：Client对Server返回的<strong><em>质询</em></strong> 做出回应，使用根具输入的密码生成的<code>NTMLM hash</code>和<strong><em>质询</em></strong> 中的<code>challenge</code>进行加密运算得到<strong><em>response</em></strong>，然后将<strong><em>response</em></strong>、用户名、<strong><em>challenge</em></strong>一起返回给Server</li>
-</ul>
-<blockquote>
-<p>关于challenge：服务端生成的一个随机字符用于验证Client的身份，NTLM v1中为8位，NTLM v2中为16位</p>
-<p>关于Net-NTML hash：基于用户hash经过一定算法产生的。</p>
-<p>关于response：本质上就是一个<code>net-NTLM hash</code></p>
-</blockquote>
+<p>Schema NC里面的条目是所有类的实例。那么既然是实例，那么这些类条目也是拥有对应的类的，主要有classSchema、attributeSchema等</p>
+<p><img src="https://my-blog-rookie.oss-cn-beijing.aliyuncs.com/img/image-20201118222649251.png" alt="image-20201118222649251"></p>
+<p><a href="https://daiker.gitbook.io/windows-protocol/ldap-pian" target="_blank" rel="noopener">参考文章</a></p>
 
         </div>
 
@@ -277,12 +268,6 @@
                 <span>Tag(s):</span>
                 <span class="tag">
                     
-                    
-                        <a href="/tags/windows%E8%AE%A4%E8%AF%81%E5%8D%8F%E8%AE%AE/"># windows认证协议</a>
-                    
-                        <a href="/tags/%E5%9F%9F%E6%B8%97%E9%80%8F%E5%9F%BA%E7%A1%80/"># 域渗透基础</a>
-                    
-                        
                 </span>
             </div>
             <div>
@@ -293,10 +278,8 @@
         </section>
         <section class="post-nav">
             
-                <a class="prev" rel="prev" href="/2020/11/17/%E5%86%85%E7%BD%91%E6%B8%97%E9%80%8F%E5%AD%A6%E4%B9%A0%E2%80%94LDAP%E5%8D%8F%E8%AE%AE/">内网渗透学习—LDAP协议</a>
             
-            
-            <a class="next" rel="next" href="/2020/11/12/%E5%86%85%E7%BD%91%E6%B8%97%E9%80%8F%E5%AD%A6%E4%B9%A0%E2%80%94kerberos%E5%8D%8F%E8%AE%AE/">域渗透学习—kerberos协议</a>
+            <a class="next" rel="next" href="/2020/11/12/%E5%86%85%E7%BD%91%E6%B8%97%E9%80%8F%E5%AD%A6%E4%B9%A0%E2%80%94NTML%E5%8D%8F%E8%AE%AE/">域渗透学习—NTML协议基础</a>
             
         </section>
 
